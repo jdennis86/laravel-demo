@@ -5,7 +5,8 @@ namespace App\Http\Controllers;
 use App\Like;
 use App\Post;
 use App\Tag;
-use Auth;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Request;
 
 class PostController extends Controller
@@ -18,7 +19,10 @@ class PostController extends Controller
 
     public function getAdminIndex()
     {
-        $posts = Post::orderBy('title', 'asc')->get();
+        if (!Auth::check()) {
+            return redirect()->back();
+        }
+        $posts = Post::where('user_id', Auth::user()->id)->orderBy('title', 'asc')->get();
         return view('admin.index', ['posts' => $posts]);
     }
 
@@ -38,12 +42,18 @@ class PostController extends Controller
 
     public function getAdminCreate()
     {
+        if (!Auth::check()) {
+            return redirect()->back();
+        }
         $tags = Tag::all();
         return view('admin.create', ['tags' => $tags]);
     }
 
     public function getAdminEdit($id)
     {
+        if (!Auth::check()) {
+            return redirect()->back();
+        }
         $post = Post::find($id);
         $tags = Tag::all();
         return view('admin.edit', ['post' => $post, 'postId' => $id, 'tags' => $tags]);
@@ -56,7 +66,7 @@ class PostController extends Controller
             'content' => 'required|min:10'
         ]);
         $user = Auth::user();
-        if (!$user) {
+        if (!Auth::check()) {
             return redirect()->back();
         }
         $post = new Post([
@@ -71,11 +81,17 @@ class PostController extends Controller
 
     public function postAdminUpdate(Request $request)
     {
+        if (!Auth::check()) {
+            return redirect()->back();
+        }
         $this->validate($request, [
             'title' => 'required|min:5',
             'content' => 'required|min:10'
         ]);
         $post = Post::find($request->input('id'));
+        if (Gate::denies('update-post', $post)) {
+            return redirect()->back();
+        }
         $post->title = $request->input('title');
         $post->content = $request->input('content');
         $post->save();
@@ -87,7 +103,13 @@ class PostController extends Controller
 
     public function getAdminDelete($id)
     {
+        if (!Auth::check()) {
+            return redirect()->back();
+        }
         $post = Post::find($id);
+        if (Gate::denies('update-post', $post)) {
+            return redirect()->back();
+        }
         $post->likes()->delete();
         $post->tags()->detach();
         $post->delete();
